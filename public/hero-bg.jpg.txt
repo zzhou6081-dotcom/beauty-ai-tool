@@ -1,0 +1,5 @@
+This is a placeholder for hero-bg.jpg background image.
+To use a real background:
+1. Place your hero background image as: /Users/mac/beauty-ai-tool/public/hero-bg.jpg
+2. Recommended: High-quality medical aesthetics themed image (2560x1440 or higher)
+3. The gradient overlay will ensure text remains readable

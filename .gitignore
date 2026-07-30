@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private IP methodology documents (not to be committed)
+/private-docs
+
+# Data directory (local only, do not commit user data)
+/data
+
+# Test scripts
+test-*.js
+quick-test.js
+create-eye-mask.js
+
+# Deployment docs (local only)
+*.md
+!README.md

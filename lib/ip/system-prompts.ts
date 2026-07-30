@@ -1,25 +1,14 @@
 import { loadPrivateDocs } from './doc-loader'
 
-/**
- * IP 智能体信息
- */
 export interface IPAgentInfo {
-  positioning: string      // 定位
-  targetAudience: string   // 目标人群
-  contentStyle: string     // 内容风格
-  keywords: string[]       // 关键词
+  positioning: string
+  targetAudience: string
+  contentStyle: string
+  keywords: string[]
 }
 
-/**
- * 系统提示词生成器
- * 基于私有文档和 IP 信息，生成针对不同功能的系统提示词
- */
-
-/**
- * 功能A：选题 → 文案生成
- */
-export function getContentGenerationPrompt(ipInfo: IPAgentInfo): string {
-  const docs = loadPrivateDocs()
+export async function getContentGenerationPrompt(ipInfo: IPAgentInfo): Promise<string> {
+  const docs = await loadPrivateDocs()
 
   return `你是一位资深的 IP 内容运营专家，专门为"${ipInfo.positioning}"创作高质量内容。
 
@@ -57,11 +46,8 @@ ${docs.methodology}
 - 标签要精准，覆盖行业词+场景词+情绪词`
 }
 
-/**
- * 功能B：数据 → 分析报告
- */
-export function getDataAnalysisPrompt(ipInfo: IPAgentInfo): string {
-  const docs = loadPrivateDocs()
+export async function getDataAnalysisPrompt(ipInfo: IPAgentInfo): Promise<string> {
+  const docs = await loadPrivateDocs()
 
   return `你是一位数据分析专家，专门分析 IP 账号的运营数据。
 
@@ -92,11 +78,8 @@ ${docs.dataAnalysis}
 - 建议要结合 IP 定位和目标人群`
 }
 
-/**
- * 功能C：周期性选题规划
- */
-export function getCalendarPlanningPrompt(ipInfo: IPAgentInfo, days: number = 14): string {
-  const docs = loadPrivateDocs()
+export async function getCalendarPlanningPrompt(ipInfo: IPAgentInfo, days: number = 14): Promise<string> {
+  const docs = await loadPrivateDocs()
 
   return `你是一位内容策划专家，擅长规划长期选题日历。
 
@@ -126,8 +109,7 @@ ${docs.methodology}
     "topic": "选题标题（简短有力）",
     "angle": "切入角度（50字内说明为什么这个选题有价值）",
     "outline": ["要点1", "要点2", "要点3"]
-  },
-  ...
+  }
 ]
 
 注意：
@@ -136,11 +118,8 @@ ${docs.methodology}
 - 每个选题都要有独特价值，避免同质化`
 }
 
-/**
- * 通用对话系统提示词
- */
-export function getChatSystemPrompt(ipInfo: IPAgentInfo): string {
-  const docs = loadPrivateDocs()
+export async function getChatSystemPrompt(ipInfo: IPAgentInfo): Promise<string> {
+  const docs = await loadPrivateDocs()
 
   return `你是一位 IP 运营助手，正在帮助用户运营"${ipInfo.positioning}"这个 IP。
 

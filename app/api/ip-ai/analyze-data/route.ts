@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     console.log('[analyze-data] 开始分析')
 
     // 生成系统提示词
-    const systemPrompt = getDataAnalysisPrompt(ipInfo)
+    const systemPrompt = await getDataAnalysisPrompt(ipInfo)
 
     // 构建用户消息
     let userMessage = '请分析以下运营数据：\n\n'

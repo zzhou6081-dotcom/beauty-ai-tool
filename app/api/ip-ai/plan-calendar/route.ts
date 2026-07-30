@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     console.log('[plan-calendar] 开始规划:', { days })
 
     // 生成系统提示词
-    const systemPrompt = getCalendarPlanningPrompt(ipInfo, days)
+    const systemPrompt = await getCalendarPlanningPrompt(ipInfo, days)
 
     // 构建用户消息
     let userMessage = `请为未来 ${days} 天规划选题日历。`

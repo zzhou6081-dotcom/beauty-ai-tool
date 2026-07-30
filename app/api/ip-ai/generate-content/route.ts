@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     console.log('[generate-content] 开始生成:', { ipInfo, topic })
 
     // 生成系统提示词
-    const systemPrompt = getContentGenerationPrompt(ipInfo)
+    const systemPrompt = await getContentGenerationPrompt(ipInfo)
 
     // 调用 Claude API
     const response = await callClaude(

@@ -1,86 +1,73 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
 /**
- * 调用 Claude API
+ * AI 客户端
+ * 使用 OpenAI 兼容接口（支持中转站）
  */
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+async function callOpenAICompat(
+  systemPrompt: string,
+  userMessage: string,
+  maxTokens: number = 4096
+): Promise<string> {
+  const baseURL = process.env.ANTHROPIC_BASE_URL || 'https://cc.zhihuiapi.top'
+  const apiKey = process.env.ANTHROPIC_API_KEY || ''
+  const model = process.env.CLAUDE_MODEL || 'gpt-5.4-mini'
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ]
+
+  const res = await fetch(`${baseURL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`AI API error ${res.status}: ${err}`)
+  }
+
+  const data = await res.json()
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error('No content in AI response')
+  return content
+}
+
 export async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  options: {
-    stream?: boolean
-    maxTokens?: number
-  } = {}
+  options: { maxTokens?: number } = {}
 ): Promise<string> {
-  const { stream = false, maxTokens = 4096 } = options
-
+  const { maxTokens = 4096 } = options
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    })
-
-    const textContent = response.content.find((c) => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text content in response')
-    }
-
-    return textContent.text
+    return await callOpenAICompat(systemPrompt, userMessage, maxTokens)
   } catch (error) {
     console.error('[claude-client] API 调用失败:', error)
     throw error
   }
 }
 
-/**
- * 流式调用 Claude API（用于聊天界面）
- */
-export async function callClaudeStream(
-  systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  maxTokens: number = 4096
-) {
-  return anthropic.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages,
-  })
-}
-
-/**
- * 解析 JSON 响应（Claude 有时会在 JSON 外包裹其他文字）
- */
 export function parseJSONResponse(text: string): any {
-  // 尝试直接解析
   try {
     return JSON.parse(text)
   } catch {
-    // 提取 JSON 块
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0])
-      } catch {
-        throw new Error('无法解析 JSON 响应')
-      }
+      try { return JSON.parse(jsonMatch[0]) } catch {}
     }
-
-    // 提取 JSON 数组
     const arrayMatch = text.match(/\[[\s\S]*\]/)
     if (arrayMatch) {
-      try {
-        return JSON.parse(arrayMatch[0])
-      } catch {
-        throw new Error('无法解析 JSON 响应')
-      }
+      try { return JSON.parse(arrayMatch[0]) } catch {}
     }
-
-    throw new Error('响应中未找到有效的 JSON')
+    throw new Error('无法解析 JSON 响应')
   }
 }

@@ -1,12 +1,6 @@
 import path from 'path'
 
-/**
- * 加载私有文档内容
- * 本地开发：从 private-docs/ 目录读取
- * 生产环境（Vercel）：从 Vercel KV 读取
- */
-
-const isProduction = process.env.KV_REST_API_URL !== undefined
+const isProduction = !!process.env.REDIS_URL
 
 export interface PrivateDocs {
   methodology: string
@@ -22,13 +16,17 @@ const FALLBACK: PrivateDocs = {
   dataAnalysis: '# 数据分析\n暂无内容。',
 }
 
-async function loadFromKV(): Promise<PrivateDocs> {
+async function loadFromRedis(): Promise<PrivateDocs> {
+  const { createClient } = await import('redis')
+  const client = createClient({ url: process.env.REDIS_URL })
   try {
-    const { kv } = await import('@vercel/kv')
-    const docs = await kv.get<PrivateDocs>('beauty_private_docs')
-    if (docs) return docs
+    await client.connect()
+    const raw = await client.get('beauty_private_docs')
+    await client.disconnect()
+    if (raw) return JSON.parse(raw) as PrivateDocs
   } catch (error) {
-    console.error('[doc-loader] KV 读取失败:', error)
+    console.error('[doc-loader] Redis 读取失败:', error)
+    try { await client.disconnect() } catch {}
   }
   return FALLBACK
 }
@@ -50,7 +48,7 @@ function loadFromFile(): PrivateDocs {
 }
 
 export async function loadPrivateDocs(): Promise<PrivateDocs> {
-  return isProduction ? loadFromKV() : loadFromFile()
+  return isProduction ? loadFromRedis() : loadFromFile()
 }
 
 export function docsExist(): boolean {

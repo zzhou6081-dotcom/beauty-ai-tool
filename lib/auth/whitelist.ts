@@ -1,7 +1,7 @@
 /**
  * 白名单和权限管理系统
  * 本地开发：读写 data/whitelist.json
- * 生产环境（Vercel）：读写 Vercel KV（Redis）
+ * 生产环境：读写 Redis（REDIS_URL）
  */
 
 export interface UserPermissions {
@@ -20,28 +20,44 @@ export interface UserPermissions {
   updatedAt: string
 }
 
-const KV_KEY = 'beauty_whitelist'
-const isProduction = process.env.KV_REST_API_URL !== undefined
+const WHITELIST_KEY = 'beauty_whitelist'
+const isProduction = !!process.env.REDIS_URL
 
-// ─── KV (生产环境) ───────────────────────────────────────────────
+// ─── Redis（生产） ────────────────────────────────────────────────
 
-async function kvLoad(): Promise<Map<string, UserPermissions>> {
-  const { kv } = await import('@vercel/kv')
-  const data = await kv.get<UserPermissions[]>(KV_KEY)
-  const map = new Map<string, UserPermissions>()
-  if (data && Array.isArray(data)) {
-    data.forEach(user => map.set(user.email.toLowerCase(), user))
+async function getRedisClient() {
+  const { createClient } = await import('redis')
+  const client = createClient({ url: process.env.REDIS_URL })
+  await client.connect()
+  return client
+}
+
+async function redisLoad(): Promise<Map<string, UserPermissions>> {
+  const client = await getRedisClient()
+  try {
+    const raw = await client.get(WHITELIST_KEY)
+    const map = new Map<string, UserPermissions>()
+    if (raw) {
+      const users: UserPermissions[] = JSON.parse(raw)
+      users.forEach(u => map.set(u.email.toLowerCase(), u))
+    }
+    return map
+  } finally {
+    await client.disconnect()
   }
-  return map
 }
 
-async function kvSave(whitelist: Map<string, UserPermissions>): Promise<void> {
-  const { kv } = await import('@vercel/kv')
-  const users = Array.from(whitelist.values())
-  await kv.set(KV_KEY, users)
+async function redisSave(whitelist: Map<string, UserPermissions>): Promise<void> {
+  const client = await getRedisClient()
+  try {
+    const users = Array.from(whitelist.values())
+    await client.set(WHITELIST_KEY, JSON.stringify(users))
+  } finally {
+    await client.disconnect()
+  }
 }
 
-// ─── 本地文件系统（开发环境） ──────────────────────────────────────
+// ─── 本地文件系统（开发） ──────────────────────────────────────────
 
 async function fileLoad(): Promise<Map<string, UserPermissions>> {
   try {
@@ -52,7 +68,7 @@ async function fileLoad(): Promise<Map<string, UserPermissions>> {
       const data = fs.readFileSync(whitelistPath, 'utf-8')
       const users: UserPermissions[] = JSON.parse(data)
       const map = new Map<string, UserPermissions>()
-      users.forEach(user => map.set(user.email.toLowerCase(), user))
+      users.forEach(u => map.set(u.email.toLowerCase(), u))
       return map
     }
   } catch (error) {
@@ -66,9 +82,7 @@ async function fileSave(whitelist: Map<string, UserPermissions>): Promise<void> 
   const path = await import('path')
   const dataDir = path.join(process.cwd(), 'data')
   const whitelistPath = path.join(dataDir, 'whitelist.json')
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   const users = Array.from(whitelist.values())
   fs.writeFileSync(whitelistPath, JSON.stringify(users, null, 2), 'utf-8')
 }
@@ -76,11 +90,11 @@ async function fileSave(whitelist: Map<string, UserPermissions>): Promise<void> 
 // ─── 公共 API ─────────────────────────────────────────────────────
 
 export async function loadWhitelist(): Promise<Map<string, UserPermissions>> {
-  return isProduction ? kvLoad() : fileLoad()
+  return isProduction ? redisLoad() : fileLoad()
 }
 
 export async function saveWhitelist(whitelist: Map<string, UserPermissions>): Promise<void> {
-  return isProduction ? kvSave(whitelist) : fileSave(whitelist)
+  return isProduction ? redisSave(whitelist) : fileSave(whitelist)
 }
 
 export async function checkWhitelist(email: string): Promise<UserPermissions | null> {
@@ -105,12 +119,7 @@ export async function upsertUser(user: Omit<UserPermissions, 'createdAt' | 'upda
   const email = user.email.toLowerCase()
   const existing = whitelist.get(email)
   const now = new Date().toISOString()
-  whitelist.set(email, {
-    ...user,
-    email,
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-  })
+  whitelist.set(email, { ...user, email, createdAt: existing?.createdAt || now, updatedAt: now })
   await saveWhitelist(whitelist)
 }
 
